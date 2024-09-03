@@ -9,7 +9,6 @@ class SNAKE:
         self.body = [Vector2(5, 10), Vector2(4, 10), Vector2(3, 10)]
         self.direction = Vector2(1, 0)  # Move to the right initially
         self.direction_queue = []  # Queue to store direction changes
-        self.powerup = False # Flag for adding new blocks
         self.new_block = False
 
     def draw_snake(self):
@@ -18,6 +17,9 @@ class SNAKE:
             yPos = int(block.y * cell_size)
             block_rect = pygame.Rect(xPos, yPos, cell_size, cell_size)
             pygame.draw.rect(screen, (0, 0, 255), block_rect)
+
+    def double_speed(self):
+        pygame.time.set_timer(SCREEN_UPDATE, 75)
 
     def move_snake(self):
         # Apply all valid direction changes from the queue
@@ -37,15 +39,12 @@ class SNAKE:
         body_copy.insert(0, body_copy[0] + self.direction)
         self.body = body_copy[:]
 
-        if self.powerup:
-            snake.speed = 2
-            self.powerup = False
-
     def add_block(self):
         self.new_block = True
 
     def powerup(self):
         self.powerup = True
+
 
 class FRUKT:
     def __init__(self):
@@ -64,6 +63,7 @@ class FRUKT:
             # Check if the fruit's position is on the snake's body
             if snake is None or self.pos not in snake.body:
                 break
+
 
 
 class PowerUp:
@@ -89,6 +89,11 @@ def check_collision():
         fruit.randomize(snake)  # Pass the snake object to check its body
         snake.add_block()
         score += 10  # Increase the score when snake eats a fruit
+
+    if snake.body[0] == powerup.pos:
+        powerup.randomize(snake)
+        snake.double_speed()
+        score += 20
 
 def check_fail():
     # Check if snake hits the wall
@@ -199,4 +204,4 @@ while True:
         pygame.quit()
         sys.exit()
 
-    clock.tick(60)  # Cap the frame rate to 60 FPS for smooth renderingssssl
+    clock.tick(60)  # Cap the frame rate to 60 FPS for smooth rendering
