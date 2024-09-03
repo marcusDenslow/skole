@@ -199,4 +199,4 @@ while True:
         pygame.quit()
         sys.exit()
 
-    clock.tick(60)  # Cap the frame rate to 60 FPS for smooth renderingssss
+    clock.tick(60)  # Cap the frame rate to 60 FPS for smooth renderingssssl
