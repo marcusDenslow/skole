@@ -21,6 +21,15 @@ class SNAKE:
     def double_speed(self):
         pygame.time.set_timer(SCREEN_UPDATE, 75)
 
+    def double_length(self):
+        current_length = len(self.body)
+        last_block = self.body[-1]
+        tail_direction = last_block - self.body[-2]
+        for _ in range(current_length):
+            new_block = last_block + tail_direction
+            self.body.append(new_block)
+            last_block = new_block
+
     def move_snake(self):
         # Apply all valid direction changes from the queue
         if self.direction_queue:
@@ -42,9 +51,6 @@ class SNAKE:
     def add_block(self):
         self.new_block = True
 
-    def powerup(self):
-        self.powerup = True
-
 
 class FRUKT:
     def __init__(self):
@@ -65,24 +71,35 @@ class FRUKT:
                 break
 
 
-
-class PowerUp:
+class SpecialBlock:
     def __init__(self):
+        self.visible = False  # Special block is initially not visible
         self.randomize()
 
-    def draw_powerup(self):
-        powerup_rect = pygame.Rect(int(self.pos.x * cell_size), int(self.pos.y * cell_size), cell_size, cell_size)
-        pygame.draw.rect(screen, (200, 200, 0), powerup_rect)
-
     def randomize(self, snake=None):
+        self.effect = random.choice(['double_speed', 'double_length'])  # Randomly select the effect
         while True:
             self.x = random.randint(0, cell_count - 1)
             self.y = random.randint(0, cell_count - 1)
             self.pos = Vector2(self.x, self.y)
 
-            # Check if the fruit's position is on the snake's body
+            # Ensure the block doesn't spawn on the snake's body
             if snake is None or self.pos not in snake.body:
                 break
+
+    def draw_block(self):
+        if self.visible:
+            color = (200, 200, 0) if self.effect == 'double_speed' else (255, 165, 0)  # Yellow for speed, orange for length
+            block_rect = pygame.Rect(int(self.pos.x * cell_size), int(self.pos.y * cell_size), cell_size, cell_size)
+            pygame.draw.rect(screen, color, block_rect)
+
+    def apply_effect(self, snake):
+        if self.effect == 'double_speed':
+            snake.double_speed()
+        elif self.effect == 'double_length':
+            snake.double_length()
+
+
 def check_collision():
     global score  # Use the global score variable
     if snake.body[0] == fruit.pos:
@@ -90,10 +107,11 @@ def check_collision():
         snake.add_block()
         score += 10  # Increase the score when snake eats a fruit
 
-    if snake.body[0] == powerup.pos:
-        powerup.randomize(snake)
-        snake.double_speed()
-        score += 20
+    if special_block.visible and snake.body[0] == special_block.pos:
+        special_block.visible = False  # Hide the block after collision
+        special_block.apply_effect(snake)
+        score += 20 if special_block.effect == 'double_speed' else 30
+
 
 def check_fail():
     # Check if snake hits the wall
@@ -134,12 +152,13 @@ screen = pygame.display.set_mode((cell_count * cell_size, cell_count * cell_size
 clock = pygame.time.Clock()
 
 
-# Initialize the snake and fruit
+# Initialize the snake, fruit, and special block
 snake = SNAKE()
 fruit = FRUKT()
-powerup = PowerUp()
-fruit.randomize(snake)# Ensure the fruit spawns in a valid position
-powerup.randomize(snake)
+special_block = SpecialBlock()
+
+fruit.randomize(snake)  # Ensure the fruit spawns in a valid position
+special_block.randomize(snake)
 
 # Initialize the score
 score = 0
@@ -150,6 +169,9 @@ score_font = pygame.font.Font(None, 36)
 SCREEN_UPDATE = pygame.USEREVENT
 pygame.time.set_timer(SCREEN_UPDATE, 150)  # Update every 150 milliseconds
 
+SPECIAL_BLOCK_TIMER = pygame.USEREVENT + 1
+pygame.time.set_timer(SPECIAL_BLOCK_TIMER, 20000)  # Trigger every 20 seconds
+
 while True:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -158,6 +180,10 @@ while True:
         if event.type == SCREEN_UPDATE:
             # Move the snake based on the timer event
             snake.move_snake()
+        if event.type == SPECIAL_BLOCK_TIMER:
+            # Show and randomize the special block every 20 seconds
+            special_block.visible = True
+            special_block.randomize(snake)
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_UP:
                 if snake.direction != Vector2(0, 1):
@@ -176,8 +202,8 @@ while True:
             if len(snake.direction_queue) > 3:
                 snake.direction_queue = snake.direction_queue[:3]
 
-
-    # add a game over screen at the end of the game loop
+    # Check for collisions and failures
+    check_collision()
     if check_fail():
         screen.fill((175, 215, 70))
         fail_surface = score_font.render('You hit the wall! Game Over!', True, (56, 74, 12))
@@ -186,22 +212,13 @@ while True:
         pygame.display.update()
         pygame.time.wait(2000)  # Wait for 2 seconds before closing
         pygame.quit()
-        sys.exit
+        sys.exit()
 
     draw_background()  # Draw the checkerboard background
     fruit.draw_fruit()
     snake.draw_snake()
-    powerup.draw_powerup()
+    special_block.draw_block()  # Draw the special block if visible
     draw_score()  # Draw the score on the screen
     pygame.display.update()
-
-    # Check for collision with fruit
-    check_collision()
-
-    # Check for failure (collision with walls or self)
-    if check_fail():
-        print("Game Over")
-        pygame.quit()
-        sys.exit()
 
     clock.tick(60)  # Cap the frame rate to 60 FPS for smooth rendering
