@@ -10,6 +10,8 @@ class SNAKE:
         self.direction = Vector2(1, 0)  # Move to the right initially
         self.direction_queue = []  # Queue to store direction changes
         self.new_block = False
+        self.speed_timer_active = False  # Track if speed effect is active
+        self.speed_timer_end_time = 0  # Time when the speed effect should end
 
     def draw_snake(self):
         for block in self.body:
@@ -19,7 +21,13 @@ class SNAKE:
             pygame.draw.rect(screen, (0, 0, 255), block_rect)
 
     def double_speed(self):
-        pygame.time.set_timer(SCREEN_UPDATE, 75)
+        pygame.time.set_timer(SCREEN_UPDATE, 75)  # Set double speed
+        self.speed_timer_active = True  # Activate the speed timer
+        self.speed_timer_end_time = pygame.time.get_ticks() + 10000  # Set the timer to 5 seconds (5000 ms)
+
+    def revert_speed(self):
+        pygame.time.set_timer(SCREEN_UPDATE, 150)  # Revert back to normal speed
+        self.speed_timer_active = False  # Deactivate the timer
 
     def double_length(self):
         current_length = len(self.body)
@@ -29,6 +37,18 @@ class SNAKE:
             new_block = last_block + tail_direction
             self.body.append(new_block)
             last_block = new_block
+        pygame.time.set_timer(SCREEN_UPDATE, 150)
+
+    def end_game(self):
+        screen.fill((175, 215, 70))
+        fail_surface = score_font.render('dont gamble!', True, (56, 74, 12))
+        fail_rect = fail_surface.get_rect(center=(cell_count * cell_size // 2, cell_count * cell_size // 2))
+        screen.blit(fail_surface, fail_rect)
+        pygame.display.update()
+        pygame.time.wait(2000)  # Wait for 2 seconds before closing
+        pygame.quit()
+        sys.exit()
+
 
     def move_snake(self):
         # Apply all valid direction changes from the queue
@@ -77,7 +97,7 @@ class SpecialBlock:
         self.randomize()
 
     def randomize(self, snake=None):
-        self.effect = random.choice(['double_speed', 'double_length'])  # Randomly select the effect
+        self.effect = random.choice(['double_speed', 'double_length', 'end_game'])  # Randomly select the effect
         while True:
             self.x = random.randint(0, cell_count - 1)
             self.y = random.randint(0, cell_count - 1)
@@ -98,6 +118,8 @@ class SpecialBlock:
             snake.double_speed()
         elif self.effect == 'double_length':
             snake.double_length()
+        elif self.effect == 'end_game':
+            snake.end_game()
 
 
 def check_collision():
@@ -105,12 +127,12 @@ def check_collision():
     if snake.body[0] == fruit.pos:
         fruit.randomize(snake)  # Pass the snake object to check its body
         snake.add_block()
-        score += 10  # Increase the score when snake eats a fruit
+        score += 1  # Increase the score when snake eats a fruit
 
     if special_block.visible and snake.body[0] == special_block.pos:
         special_block.visible = False  # Hide the block after collision
         special_block.apply_effect(snake)
-        score += 20 if special_block.effect == 'double_speed' else 30
+        score *= 2 if special_block.effect == 'double_length' else 1
 
 
 def check_fail():
@@ -161,7 +183,7 @@ fruit.randomize(snake)  # Ensure the fruit spawns in a valid position
 special_block.randomize(snake)
 
 # Initialize the score
-score = 0
+score = len(snake.body)
 
 # Font for displaying the score
 score_font = pygame.font.Font(None, 36)
@@ -202,6 +224,10 @@ while True:
             if len(snake.direction_queue) > 3:
                 snake.direction_queue = snake.direction_queue[:3]
 
+    # Check if the speed effect has expired
+    if snake.speed_timer_active and pygame.time.get_ticks() > snake.speed_timer_end_time:
+        snake.revert_speed()
+
     # Check for collisions and failures
     check_collision()
     if check_fail():
@@ -221,4 +247,4 @@ while True:
     draw_score()  # Draw the score on the screen
     pygame.display.update()
 
-    clock.tick(60)  # Cap the frame rate to 60 FPS for smooth rendering
+    clock.tick(60)  # Cap the frame rate to 60 FPS for smooth renderings
