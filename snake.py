@@ -239,6 +239,7 @@ while True:
         pygame.time.wait(2000)  # Wait for 2 seconds before closing
         pygame.quit()
         sys.exit()
+        print("hello")
 
     draw_background()  # Draw the checkerboard background
     fruit.draw_fruit()
