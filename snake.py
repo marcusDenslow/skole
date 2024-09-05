@@ -12,6 +12,8 @@ class SNAKE:
         self.new_block = False
         self.speed_timer_active = False  # Track if speed effect is active
         self.speed_timer_end_time = 0  # Time when the speed effect should end
+        self.inverted_timer_active = False  # Track if inverted controls effect is active
+        self.inverted_timer_end_time = 0  # Time when inverted controls should end
 
     def draw_snake(self):
         for block in self.body:
@@ -23,11 +25,15 @@ class SNAKE:
     def double_speed(self):
         pygame.time.set_timer(SCREEN_UPDATE, 75)  # Set double speed
         self.speed_timer_active = True  # Activate the speed timer
-        self.speed_timer_end_time = pygame.time.get_ticks() + 10000  # Set the timer to 5 seconds (5000 ms)
+        self.speed_timer_end_time = pygame.time.get_ticks() + 10000  # Set the timer to 10 seconds
 
     def revert_speed(self):
         pygame.time.set_timer(SCREEN_UPDATE, 150)  # Revert back to normal speed
         self.speed_timer_active = False  # Deactivate the timer
+
+    def revert_invertedControls(self):
+        # Revert to normal controls (stop inverting the controls)
+        self.inverted_timer_active = False
 
     def double_length(self):
         current_length = len(self.body)
@@ -39,16 +45,20 @@ class SNAKE:
             last_block = new_block
         pygame.time.set_timer(SCREEN_UPDATE, 150)
 
+    def inverted_controls(self):
+        # Activate the inverted controls timer
+        self.inverted_timer_active = True
+        self.inverted_timer_end_time = pygame.time.get_ticks() + 10000  # Set timer for 10 seconds
+
     def end_game(self):
         screen.fill((175, 215, 70))
-        fail_surface = score_font.render('dont gamble!', True, (56, 74, 12))
+        fail_surface = score_font.render('Dont gamble!', True, (56, 74, 12))
         fail_rect = fail_surface.get_rect(center=(cell_count * cell_size // 2, cell_count * cell_size // 2))
         screen.blit(fail_surface, fail_rect)
         pygame.display.update()
         pygame.time.wait(2000)  # Wait for 2 seconds before closing
         pygame.quit()
         sys.exit()
-
 
     def move_snake(self):
         # Apply all valid direction changes from the queue
@@ -97,7 +107,7 @@ class SpecialBlock:
         self.randomize()
 
     def randomize(self, snake=None):
-        self.effect = random.choice(['double_speed', 'double_length', 'end_game'])  # Randomly select the effect
+        self.effect = random.choice(['inverted_controls', 'end_game', 'double_speed', 'double_length'])  # Randomly select the effect
         while True:
             self.x = random.randint(0, cell_count - 1)
             self.y = random.randint(0, cell_count - 1)
@@ -109,12 +119,19 @@ class SpecialBlock:
 
     def draw_block(self):
         if self.visible:
-            color = (200, 200, 0) if self.effect == 'double_speed' else (255, 165, 0)  # Yellow for speed, orange for length
+            if self.effect == 'inverted_controls':
+                color = (0,0,255)
+            elif self.effect == 'double_speed':
+                color = (255,255,0)
+            elif self.effect == 'double_length' or self.effect == 'end_game':
+                color = (0,255,0)
             block_rect = pygame.Rect(int(self.pos.x * cell_size), int(self.pos.y * cell_size), cell_size, cell_size)
             pygame.draw.rect(screen, color, block_rect)
 
     def apply_effect(self, snake):
-        if self.effect == 'double_speed':
+        if self.effect == 'inverted_controls':
+            snake.inverted_controls()
+        elif self.effect == 'double_speed':
             snake.double_speed()
         elif self.effect == 'double_length':
             snake.double_length()
@@ -132,7 +149,6 @@ def check_collision():
     if special_block.visible and snake.body[0] == special_block.pos:
         special_block.visible = False  # Hide the block after collision
         special_block.apply_effect(snake)
-        score *= 2 if special_block.effect == 'double_length' else 1
 
 
 def check_fail():
@@ -147,32 +163,32 @@ def check_fail():
             return True
     return False
 
+
 def draw_score():
     score_surface = score_font.render(f'Score: {score}', True, (56, 74, 12))
     score_rect = score_surface.get_rect(center=(cell_size * 1.5, cell_size * 0.5))
     screen.blit(score_surface, score_rect)
 
+
 color1 = (170, 215, 81)
 color2 = (162, 209, 73)
+
 
 def draw_background():
     for row in range(cell_count):
         for col in range(cell_count):
-            if (row + col) % 2 == 0:
-                color = color1
-            else:
-                color = color2
+            color = color1 if (row + col) % 2 == 0 else color2
             rect = pygame.Rect(col * cell_size, row * cell_size, cell_size, cell_size)
             pygame.draw.rect(screen, color, rect)
 
 
+# Initialize Pygame
 pygame.init()
 
 cell_size = 40
 cell_count = 15
 screen = pygame.display.set_mode((cell_count * cell_size, cell_count * cell_size))
 clock = pygame.time.Clock()
-
 
 # Initialize the snake, fruit, and special block
 snake = SNAKE()
@@ -207,18 +223,35 @@ while True:
             special_block.visible = True
             special_block.randomize(snake)
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_UP:
-                if snake.direction != Vector2(0, 1):
-                    snake.direction_queue.append(Vector2(0, -1))
-            if event.key == pygame.K_DOWN:
-                if snake.direction != Vector2(0, -1):
-                    snake.direction_queue.append(Vector2(0, 1))
-            if event.key == pygame.K_RIGHT:
-                if snake.direction != Vector2(-1, 0):
-                    snake.direction_queue.append(Vector2(1, 0))
-            if event.key == pygame.K_LEFT:
-                if snake.direction != Vector2(1, 0):
-                    snake.direction_queue.append(Vector2(-1, 0))
+            # Check if inverted controls are active
+            if snake.inverted_timer_active:
+                # Inverted controls logic
+                if event.key == pygame.K_UP:
+                    if snake.direction != Vector2(0, -1):
+                        snake.direction_queue.append(Vector2(0, 1))  # Inverted: up moves down
+                if event.key == pygame.K_DOWN:
+                    if snake.direction != Vector2(0, 1):
+                        snake.direction_queue.append(Vector2(0, -1))  # Inverted: down moves up
+                if event.key == pygame.K_RIGHT:
+                    if snake.direction != Vector2(1, 0):
+                        snake.direction_queue.append(Vector2(-1, 0))  # Inverted: right moves left
+                if event.key == pygame.K_LEFT:
+                    if snake.direction != Vector2(-1, 0):
+                        snake.direction_queue.append(Vector2(1, 0))  # Inverted: left moves right
+            else:
+                # Normal controls logic
+                if event.key == pygame.K_UP:
+                    if snake.direction != Vector2(0, 1):
+                        snake.direction_queue.append(Vector2(0, -1))
+                if event.key == pygame.K_DOWN:
+                    if snake.direction != Vector2(0, -1):
+                        snake.direction_queue.append(Vector2(0, 1))
+                if event.key == pygame.K_RIGHT:
+                    if snake.direction != Vector2(-1, 0):
+                        snake.direction_queue.append(Vector2(1, 0))
+                if event.key == pygame.K_LEFT:
+                    if snake.direction != Vector2(1, 0):
+                        snake.direction_queue.append(Vector2(-1, 0))
 
             # Limit the direction queue size to avoid overfilling
             if len(snake.direction_queue) > 3:
@@ -227,6 +260,10 @@ while True:
     # Check if the speed effect has expired
     if snake.speed_timer_active and pygame.time.get_ticks() > snake.speed_timer_end_time:
         snake.revert_speed()
+
+    # Check if the inverted controls effect has expired
+    if snake.inverted_timer_active and pygame.time.get_ticks() > snake.inverted_timer_end_time:
+        snake.revert_invertedControls()
 
     # Check for collisions and failures
     check_collision()
@@ -239,7 +276,6 @@ while True:
         pygame.time.wait(2000)  # Wait for 2 seconds before closing
         pygame.quit()
         sys.exit()
-        print("hello")
 
     draw_background()  # Draw the checkerboard background
     fruit.draw_fruit()
